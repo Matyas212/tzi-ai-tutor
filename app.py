@@ -6,6 +6,7 @@ from pypdf import PdfReader
 
 # 1. Nastavení vzhledu stránky
 st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="centered")
+
 st.title("🎓 Výukový AI Tutor - TZI I")
 st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
 
@@ -56,9 +57,9 @@ Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následuj
 {STUDY_MATERIALS if STUDY_MATERIALS else "Strojově dostupné podklady v PDF formátu nebyly nahrány, vycházej z obecných osnov předmětu TZI I na UJEP."}
 """
 
-# Vytvoření modelu s lehkou bezplatnou verzí Lite
+# Vytvoření modelu s aktuálním podporovaným aliasem
 model = genai.GenerativeModel(
-    model_name="models/gemini-flash-lite-latest"",
+    model_name="models/gemini-flash-lite-latest",
     system_instruction=SYSTEM_INSTRUCTIONS,
     generation_config={"temperature": 0.7}
 )
@@ -67,7 +68,7 @@ model = genai.GenerativeModel(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Tlačítko pro vyčištění chatu
+# Tlačítko pro vyčištění chatu v bočním panelu
 if st.sidebar.button("🧹 Vymazat konverzaci"):
     st.session_state.messages = []
     st.rerun()
