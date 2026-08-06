@@ -1,6 +1,5 @@
 import streamlit as st
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 # 1. Nastavení vzhledu stránky
 st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="centered")
@@ -8,9 +7,9 @@ st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="cent
 st.title("🎓 Výukový AI Tutor - TZI I")
 st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
 
-# 2. Inicializace klienta Gemini (vynucení stabilní verze API v1 pro Free Tier)
+# 2. Inicializace klienta Gemini
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
-client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
+genai.configure(api_key=api_key)
 
 # Podrobné systémové instrukce
 SYSTEM_INSTRUCTIONS = """
@@ -35,6 +34,13 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 5. Procvičování: Pokud student požádá o procvičování z konkrétní kapitoly, vygeneruj příklad odpovídající náročnosti úloh ze cvičení (ZM 1 až ZM 9).
 6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem (např. ekvivalence, rozklad množiny, kartézský součin, relace, důkaz sporem), uveď kromě formální definice i krátký, názorný příměr z reálného života nebo z praxe v informatice pro lepší představivost.
 """
+
+# Vytvoření modelu s nastavenými instrukcemi
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction=SYSTEM_INSTRUCTIONS,
+    generation_config={"temperature": 0.7}
+)
 
 # 3. Inicializace relace chatu
 if "messages" not in st.session_state:
@@ -61,14 +67,7 @@ if prompt:
     with st.chat_message("assistant"):
         with st.spinner("AI Tutor přemýšlí..."):
             try:
-                response = client.models.generate_content(
-                    model="gemini-1.5-flash",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_INSTRUCTIONS,
-                        temperature=0.7,
-                    ),
-                )
+                response = model.generate_content(prompt)
                 answer = response.text
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
