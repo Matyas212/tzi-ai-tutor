@@ -59,7 +59,7 @@ Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následuj
 
 # Vytvoření modelu s lehkou bezplatnou verzí Lite
 model = genai.GenerativeModel(
-    model_name="models/gemini-2.5-flash-lite",
+    model_name="models/gemini-flash-lite-latest"",
     system_instruction=SYSTEM_INSTRUCTIONS,
     generation_config={"temperature": 0.7}
 )
