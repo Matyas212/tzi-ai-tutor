@@ -64,7 +64,7 @@ if prompt:
         with st.spinner("AI Tutor přemýšlí..."):
             try:
                 response = client.models.generate_content(
-                    model="gemini-1.5-flash-latest",
+                    model="gemini-1.5-flash",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTIONS,
