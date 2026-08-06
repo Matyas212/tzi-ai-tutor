@@ -74,4 +74,6 @@ if prompt:
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 st.rerun()
             except Exception as e:
-                st.error("Chyba při komunikaci s AI službou. Vyčkejte chvíli a zkuste dotaz poslat znovu.")
+                # Zobrazíme přesný detail chyby pro rychlou diagnostiku
+                st.error(f"Pevný výpis chyby API: {e}")
+                
