@@ -2,23 +2,24 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-# Nastavení vzhledu stránky
+# 1. Nastavení vzhledu stránky
 st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="centered")
 
 st.title("🎓 Výukový AI Tutor - TZI I")
 st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
 
-# Inicializace klienta a nastavení systému
-API_KEY = st.secrets["GEMINI_API_KEY"].strip()
-client = genai.Client(api_key=API_KEY)
+# 2. Inicializace klienta Gemini (vyčištění případných mezer/odřádkování)
+api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
+client = genai.Client(api_key=api_key)
 
+# Podrobné systémové instrukce určující chování a didaktiku AI Tutora
 SYSTEM_INSTRUCTIONS = """
 Jsi odborný výukový asistent (AI Tutor) pro vysokoškolský předmět "Teoretické základy informatiky I" (TZI I) na Přírodovědecké fakultě UJEP. 
 Tvým cílem je pomáhat studentům pochopit matematické a informatické koncepty, procvičovat látku a připravit se na testy.
 
 TVÁ OSOBNOST A TÓN:
 - Jsi trpělivý, povzbuzující, stručný a matematicky přesný.
-- Používáš jasný a srozumitelný jazyk. Matematické a logické výrazy píšeš přehledně v LaTeX formátu (např. $a \Rightarrow b$).
+- Používáš jasný a srozumitelný jazyk. Matematické a logické výrazy píšeš přehledně v LaTeX formátu (např. $a \\Rightarrow b$).
 
 DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 1. NIKDY nedávej studentovi kompletní řešení příkladu hned v první odpovědi, pokud tě o to explicitně nepožádá.
@@ -35,32 +36,10 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem (např. ekvivalence, rozklad množiny, kartézský součin, relace, důkaz sporem), uveď kromě formální definice i krátký, názorný příměr z reálného života nebo z praxe v informatice pro lepší představivost.
 """
 
-# Paměť konverzace v rámci jedné relace
+# 3. Inicializace relace chatu (při novém otevření odkazu bude chat vždy čistý)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Zobrazení historie konverzace
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Vstup pro dotaz uživatele
-if prompt := st.chat_input("Zadej dotaz nebo požádej o procvičení..."):
-    # Uložení a zobrazení dotazu
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Generování odpovědi modelem Gemini
-    with st.chat_message("assistant"):
-        with st.spinner("AI Tutor přemýšlí..."):
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=[m["content"] for m in st.session_state.messages],
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTIONS,
-                    temperature=0.7,
-                )
-            )
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
+# Tlačítko v bočním panelu pro ruční vyčištění chatu
+if st.sidebar.button("🧹 Vymazat konverzaci"):
+    st.session_state.messages = []
