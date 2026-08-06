@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+import os
 
 # 1. Nastavení vzhledu stránky
 st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="centered")
@@ -11,8 +12,16 @@ st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
 
-# Podrobné systémové instrukce
-SYSTEM_INSTRUCTIONS = """
+# 3. Načtení studijních materiálů ze složky (pokud existují)
+STUDY_MATERIALS = ""
+materials_file = "podklady_tzi.txt"  # Název souboru s podklady na GitHubu
+
+if os.path.exists(materials_file):
+    with open(materials_file, "r", encoding="utf-8") as f:
+        STUDY_MATERIALS = f.read()
+
+# Podrobné systémové instrukce + studijní materiály
+SYSTEM_INSTRUCTIONS = f"""
 Jsi odborný výukový asistent (AI Tutor) pro vysokoškolský předmět "Teoretické základy informatiky I" (TZI I) na Přírodovědecké fakultě UJEP. 
 Tvým cílem je pomáhat studentům pochopit matematické a informatické koncepty, procvičovat látku a připravit se na testy.
 
@@ -29,34 +38,38 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
    - Neříkej jen "To je špatně". 
    - Ukaž mu, ve kterém kroku úvaha selhala, vysvětli *proč* (připomeň příslušnou definici nebo větu z textu) a vyzvi ho k opravě.
 4. Výroková logika (Negace, Obrácení, Obměna):
-   - Při vysvětlování látky kolem výrokové logiky (negace, obrácení a obměna implikace) vysvětluj koncepty co nejjednodušeji a polopaticky.
-   - Kdykoliv je to možné, používej pro srovnání těchto tvarů přehledné TABULKY, které studentům pomáhají látku lépe vizualizovat a pochopit.
+   - Při vysvětlování látky kolem výrokové logiky vysvětluj koncepty co nejjednodušeji a polopaticky.
+   - Kdykoliv je to možné, používej pro srovnání těchto tvarů přehledné TABULKY.
 5. Procvičování: Pokud student požádá o procvičování z konkrétní kapitoly, vygeneruj příklad odpovídající náročnosti úloh ze cvičení (ZM 1 až ZM 9).
-6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem (např. ekvivalence, rozklad množiny, kartézský součin, relace, důkaz sporem), uveď kromě formální definice i krátký, názorný příměr z reálného života nebo z praxe v informatice pro lepší představivost.
+6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem, uveď kromě formální definice i krátký příměr z reálného života.
+
+DŮLEŽITÉ - STUDIJNÍ MATERIÁLY K PŘEDMĚTU:
+Čerpej z následujících studijních textů a úloh:
+{STUDY_MATERIALS if STUDY_MATERIALS else "Strojově dostupné podklady zatím nebyly nahrány, vycházej z obecných osnov předmětu TZI I na UJEP."}
 """
 
-# Vytvoření modelu s plně podporovaným bezplatným modelem Lite
+# Vytvoření modelu
 model = genai.GenerativeModel(
     model_name="models/gemini-2.0-flash-lite",
     system_instruction=SYSTEM_INSTRUCTIONS,
     generation_config={"temperature": 0.7}
 )
 
-# 3. Inicializace relace chatu
+# 4. Inicializace relace chatu
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Tlačítko pro vyčištění chatu v bočním panelu
+# Tlačítko pro vyčištění chatu
 if st.sidebar.button("🧹 Vymazat konverzaci"):
     st.session_state.messages = []
     st.rerun()
 
-# 4. Vykreslení historie zpráv
+# 5. Vykreslení historie zpráv
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 5. Vstupní pole
+# 6. Vstupní pole
 prompt = st.chat_input("Napište svůj dotaz...")
 
 if prompt:
@@ -72,5 +85,5 @@ if prompt:
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 st.rerun()
-            except Exception:
-                st.error("Chyba při komunikaci s AI službou. Vyčkejte chvíli a zkuste dotaz poslat znovu.")
+            except Exception as e:
+                st.error(f"Pevný výpis chyby API: {e}")
