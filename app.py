@@ -8,11 +8,11 @@ st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="cent
 st.title("🎓 Výukový AI Tutor - TZI I")
 st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
 
-# 2. Inicializace klienta Gemini (vyčištění případných mezer/odřádkování)
+# 2. Inicializace klienta Gemini
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 client = genai.Client(api_key=api_key)
 
-# Podrobné systémové instrukce určující chování a didaktiku AI Tutora
+# Podrobné systémové instrukce
 SYSTEM_INSTRUCTIONS = """
 Jsi odborný výukový asistent (AI Tutor) pro vysokoškolský předmět "Teoretické základy informatiky I" (TZI I) na Přírodovědecké fakultě UJEP. 
 Tvým cílem je pomáhat studentům pochopit matematické a informatické koncepty, procvičovat látku a připravit se na testy.
@@ -36,10 +36,44 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem (např. ekvivalence, rozklad množiny, kartézský součin, relace, důkaz sporem), uveď kromě formální definice i krátký, názorný příměr z reálného života nebo z praxe v informatice pro lepší představivost.
 """
 
-# 3. Inicializace relace chatu (při novém otevření odkazu bude chat vždy čistý)
+# 3. Inicializace relace chatu
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Tlačítko v bočním panelu pro ruční vyčištění chatu
+# Tlačítko pro vyčištění chatu v postranním panelu
 if st.sidebar.button("🧹 Vymazat konverzaci"):
     st.session_state.messages = []
+    st.rerun()
+
+# 4. Vykreslení historie zpráv přímo na střed plochy
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# 5. Vstupní pole pro dotaz (bude vždy přímo na hlavní ploše)
+prompt = st.chat_input("Napište svůj dotaz...")
+
+if prompt:
+    # Zobrazení dotazu uživatele
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Generování odpovědi od AI
+    with st.chat_message("assistant"):
+        with st.spinner("AI Tutor přemýšlí..."):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTIONS,
+                        temperature=0.7,
+                    ),
+                )
+                answer = response.text
+                st.markdown(answer)
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.rerun()
+            except Exception as e:
+                st.error(f"Chyba při komunikaci s API: {e}")
