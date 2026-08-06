@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import os
 import glob
+import re
 from pypdf import PdfReader
 
 # 1. Nastavení vzhledu stránky
@@ -13,6 +14,14 @@ st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I
 # 2. Inicializace klienta Gemini
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
+
+# Funkce pro vyčištění textu - odstraní uvozovky kódového bloku (backticks) z matematických výrazů
+def clean_latex(text: str) -> str:
+    # Odstraní uvozovky kódových bloků kolem dolarů, např. `$p \Rightarrow q$` -> $p \Rightarrow q$
+    text = re.sub(r'`(\$[^`]+\$)`', r'\1', text)
+    # Odstraní samostatné uvozovky u čísel v tabulkách/textu
+    text = re.sub(r'`(\d+)`', r'\1', text)
+    return text
 
 # 3. Načtení textu ze všech PDF souborů v repozitáři
 STUDY_MATERIALS = ""
@@ -35,12 +44,11 @@ Jsi odborný výukový asistent (AI Tutor) pro vysokoškolský předmět "Teoret
 Tvým cílem je pomáhat studentům pochopit matematické a informatické koncepty, procvičovat látku a připravit se na testy.
 
 PRAVIDLA PRO MATEMATICKÝ ZÁPIS A FORMÁTOVÁNÍ (EXTRÉMNĚ DŮLEŽITÉ):
-1. VŠECHNY matematické symboly, výrokové formule, proměnné a relace MUSÍŠ psát v platném LaTeXu uzavřeném v dolarech!
-   - Inline zápis uvnitř věty: např. `$p \\Rightarrow q$`, `$x \\in \\mathbb{{R}}$`, `$\\forall x \\in \\mathbb{{R}}$`, `$x^2 > 25$`.
-   - Samostatný vzorec na novém řádku: použij dvojité dolary, např. 
-     $$(\\forall x \\in \\mathbb{{R}})(x > 5 \\Rightarrow x^2 > 25)$$
-2. NIKDY nevypisuj LaTeXové příkazy bez dolarů (např. nepiš `\\Rightarrow` nebo `\\in` jen tak v textu).
-3. PŘESNOST ZÁPISU: Příklady, formulace, symboliku i strukturu úloh z přiložených materiálů (ZM 1 až ZM 9) kopíruj a přepisuj do detailu PŘESNĚ tak, jak jsou uvedeny v předloze. Neneměň značení proměnných ani typ závorek.
+1. VŠECHNY matematické symboly, výrokové formule, šipky, proměnné a relace MUSÍŠ psát POUZE v platném LaTeXu uzavřeném v dolarech!
+   - Správně: $p \\Rightarrow q$, $p \\land \\neg q$, $p \\iff q$, $x \\in \\mathbb{{R}}$, $\\forall x$, $\\exists x$.
+   - Samostatný vzorec na novém řádku: $$p \\Rightarrow q$$
+2. NIKDY nepoužívej zpětné uvozovky (backticks `) kolem matematiky, formulí ani čísel! Píše se $p \\Rightarrow q$, NIKDY NE `$p \\Rightarrow q$`.
+3. PŘESNOST ZÁPISU: Všechny výrokové znaky, konjunkce ($\\land$), disjunkce ($\\lor$), negace ($\\neg$), implikace ($\\Rightarrow$), ekvivalence ($\\iff$) a kvantifikátory přepisuj přesně tak, jak jsou v zadání a skriptech.
 
 DIDAKTICKÁ PRAVIDLA:
 1. NIKDY nedávej studentovi kompletní řešení příkladu hned v první odpovědi, pokud tě o to explicitně nepožádá.
@@ -49,12 +57,10 @@ DIDAKTICKÁ PRAVIDLA:
    - Polož mu naváděcí otázku nebo mu dej nápovědu pro první krok.
 3. Pokud student udělá chybu:
    - Neříkej jen "To je špatně". 
-   - Ukaž mu, ve kterém kroku úvaha selhala, vysvětli *proč* (připomeň příslušnou definici nebo větu z textu) a vyzvi ho k opravě.
+   - Ukaž mu, ve kterém kroku úvaha selhala, vysvětli *proč* a vyzvi ho k opravě.
 4. Výroková logika (Negace, Obrácení, Obměna):
-   - Při vysvětlování látky kolem výrokové logiky vysvětluj koncepty co nejjednodušeji a polopaticky.
-   - Kdykoliv je to možné, používej pro srovnání těchto tvarů přehledné TABULKY.
+   - Při vysvětlování látky kolem výrokové logiky používaj pro srovnání tvarů přehledné TABULKY.
 5. Procvičování: Pokud student požádá o procvičování z konkrétní kapitoly, vygeneruj příklad přesně podle formátu úloh ze cvičení (ZM 1 až ZM 9).
-6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem, uveď kromě formální definice i krátký příměr z reálného života.
 
 DŮLEŽITÉ - STUDIJNÍ MATERIÁLY K PŘEDMĚTU:
 Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následujících nahraných podkladů:
@@ -94,7 +100,8 @@ if prompt:
         with st.spinner("AI Tutor přemýšlí..."):
             try:
                 response = model.generate_content(prompt)
-                answer = response.text
+                # Vyčištění odpovědi od nechtěných uvozovek kódového bloku
+                answer = clean_latex(response.text)
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 st.rerun()
