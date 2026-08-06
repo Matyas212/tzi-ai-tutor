@@ -9,7 +9,7 @@ st.title("🎓 Výukový AI Tutor - TZI I")
 st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
 
 # Inicializace klienta a nastavení systému
-API_KEY = st.secrets["GEMINI_API_KEY"]
+API_KEY = st.secrets["GEMINI_API_KEY"].strip()
 client = genai.Client(api_key=API_KEY)
 
 SYSTEM_INSTRUCTIONS = """
