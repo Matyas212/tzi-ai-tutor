@@ -1,6 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
 import os
+import glob
+from pypdf import PdfReader
 
 # 1. Nastavení vzhledu stránky
 st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="centered")
@@ -12,13 +14,20 @@ st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
 
-# 3. Načtení studijních materiálů ze složky (pokud existují)
+# 3. Načtení textu ze všech PDF souborů v repozitáři
 STUDY_MATERIALS = ""
-materials_file = "podklady_tzi.txt"  # Název souboru s podklady na GitHubu
+pdf_files = glob.glob("*.pdf")
 
-if os.path.exists(materials_file):
-    with open(materials_file, "r", encoding="utf-8") as f:
-        STUDY_MATERIALS = f.read()
+for pdf_file in pdf_files:
+    try:
+        reader = PdfReader(pdf_file)
+        STUDY_MATERIALS += f"\n--- OBSAH SOUBORU {pdf_file} ---\n"
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                STUDY_MATERIALS += text + "\n"
+    except Exception as read_err:
+        st.warning(f"Nepodařilo se načíst PDF {pdf_file}: {read_err}")
 
 # Podrobné systémové instrukce + studijní materiály
 SYSTEM_INSTRUCTIONS = f"""
@@ -44,11 +53,11 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem, uveď kromě formální definice i krátký příměr z reálného života.
 
 DŮLEŽITÉ - STUDIJNÍ MATERIÁLY K PŘEDMĚTU:
-Čerpej z následujících studijních textů a úloh:
-{STUDY_MATERIALS if STUDY_MATERIALS else "Strojově dostupné podklady zatím nebyly nahrány, vycházej z obecných osnov předmětu TZI I na UJEP."}
+Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následujících nahraných podkladů:
+{STUDY_MATERIALS if STUDY_MATERIALS else "Strojově dostupné podklady v PDF formátu nebyly nahrány, vycházej z obecných osnov předmětu TZI I na UJEP."}
 """
 
-# Vytvoření modelu
+# Vytvoření modelu s lehkou bezplatnou verzí Lite
 model = genai.GenerativeModel(
     model_name="models/gemini-2.0-flash-lite",
     system_instruction=SYSTEM_INSTRUCTIONS,
