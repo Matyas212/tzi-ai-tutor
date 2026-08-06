@@ -40,31 +40,29 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Tlačítko pro vyčištění chatu v postranním panelu
+# Tlačítko v bočním panelu
 if st.sidebar.button("🧹 Vymazat konverzaci"):
     st.session_state.messages = []
     st.rerun()
 
-# 4. Vykreslení historie zpráv přímo na střed plochy
+# 4. Vykreslení historie zpráv
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 5. Vstupní pole pro dotaz (bude vždy přímo na hlavní ploše)
+# 5. Vstupní pole
 prompt = st.chat_input("Napište svůj dotaz...")
 
 if prompt:
-    # Zobrazení dotazu uživatele
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generování odpovědi od AI
     with st.chat_message("assistant"):
         with st.spinner("AI Tutor přemýšlí..."):
             try:
                 response = client.models.generate_content(
-                    model="models/gemini-1.5-flash",
+                    model="gemini-2.0-flash",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTIONS,
@@ -76,4 +74,4 @@ if prompt:
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 st.rerun()
             except Exception as e:
-                st.error(f"Chyba při komunikaci s API: {e}")
+                st.error("Chyba při komunikaci s AI službou. Vyčkejte chvíli a zkuste dotaz poslat znovu.")
