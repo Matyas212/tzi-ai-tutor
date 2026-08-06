@@ -35,9 +35,9 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem (např. ekvivalence, rozklad množiny, kartézský součin, relace, důkaz sporem), uveď kromě formální definice i krátký, názorný příměr z reálného života nebo z praxe v informatice pro lepší představivost.
 """
 
-# Vytvoření modelu s ověřeným podporovaným názvem
+# Vytvoření modelu s plně podporovaným bezplatným modelem Lite
 model = genai.GenerativeModel(
-    model_name="models/gemini-2.0-flash",
+    model_name="models/gemini-2.0-flash-lite",
     system_instruction=SYSTEM_INSTRUCTIONS,
     generation_config={"temperature": 0.7}
 )
@@ -46,7 +46,7 @@ model = genai.GenerativeModel(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Tlačítko pro vyčištění chatu
+# Tlačítko pro vyčištění chatu v bočním panelu
 if st.sidebar.button("🧹 Vymazat konverzaci"):
     st.session_state.messages = []
     st.rerun()
@@ -72,5 +72,5 @@ if prompt:
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 st.rerun()
-            except Exception as e:
-                st.error(f"Pevný výpis chyby API: {e}")
+            except Exception:
+                st.error("Chyba při komunikaci s AI službou. Vyčkejte chvíli a zkuste dotaz poslat znovu.")
