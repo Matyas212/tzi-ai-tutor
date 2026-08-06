@@ -64,7 +64,7 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant"):
+   with st.chat_message("assistant"):
         with st.spinner("AI Tutor přemýšlí..."):
             try:
                 response = model.generate_content(prompt)
@@ -72,5 +72,5 @@ if prompt:
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 st.rerun()
-            except Exception:
-                st.error("Chyba při komunikaci s AI službou. Vyčkejte chvíli a zkuste dotaz poslat znovu.")
+            except Exception as e:
+                st.error(f"Pevný výpis chyby API: {e}")
