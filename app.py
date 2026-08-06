@@ -67,6 +67,10 @@ if prompt:
     with st.chat_message("assistant"):
         with st.spinner("AI Tutor přemýšlí..."):
             try:
+                # Zjištění, které modely tvůj klíč vidí
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                st.write("Dostupné modely pro tvůj API klíč:", available_models)
+                
                 response = model.generate_content(prompt)
                 answer = response.text
                 st.markdown(answer)
