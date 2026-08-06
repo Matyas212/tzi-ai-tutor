@@ -8,9 +8,9 @@ st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="cent
 st.title("🎓 Výukový AI Tutor - TZI I")
 st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
 
-# 2. Inicializace klienta Gemini
+# 2. Inicializace klienta Gemini (vynucení stabilní verze API v1 pro Free Tier)
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
-client = genai.Client(api_key=api_key)
+client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
 
 # Podrobné systémové instrukce
 SYSTEM_INSTRUCTIONS = """
@@ -40,7 +40,7 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Tlačítko v bočním panelu
+# Tlačítko pro vyčištění chatu
 if st.sidebar.button("🧹 Vymazat konverzaci"):
     st.session_state.messages = []
     st.rerun()
@@ -62,7 +62,7 @@ if prompt:
         with st.spinner("AI Tutor přemýšlí..."):
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-1.5-flash",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTIONS,
@@ -74,6 +74,4 @@ if prompt:
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 st.rerun()
             except Exception as e:
-                # Zobrazíme přesný detail chyby pro rychlou diagnostiku
                 st.error(f"Pevný výpis chyby API: {e}")
-                
