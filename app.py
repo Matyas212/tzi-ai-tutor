@@ -35,9 +35,9 @@ DIDAKTICKÁ PRAVIDLA (EXTRÉMNĚ DŮLEŽITÉ):
 6. Ilustrace z reálného života: Kdykoliv vysvětluješ nový teoretický pojem (např. ekvivalence, rozklad množiny, kartézský součin, relace, důkaz sporem), uveď kromě formální definice i krátký, názorný příměr z reálného života nebo z praxe v informatice pro lepší představivost.
 """
 
-# Vytvoření modelu s přesným podporovaným názvem
+# Vytvoření modelu s ověřeným podporovaným názvem
 model = genai.GenerativeModel(
-    model_name="models/gemini-2.5-flash",
+    model_name="models/gemini-2.0-flash",
     system_instruction=SYSTEM_INSTRUCTIONS,
     generation_config={"temperature": 0.7}
 )
@@ -64,7 +64,7 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-   with st.chat_message("assistant"):
+    with st.chat_message("assistant"):
         with st.spinner("AI Tutor přemýšlí..."):
             try:
                 response = model.generate_content(prompt)
