@@ -15,15 +15,17 @@ st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
 
-# Funkce pro vyčištění textu - odstraní uvozovky kódového bloku z matematických výrazů a opraví LaTeX
+# Funkce pro vyčištění textu a odstranění duplicit z PDF
 def clean_latex(text: str) -> str:
     text = re.sub(r'`(\$[^`]+\$)`', r'\1', text)
     text = re.sub(r'`(\d+)`', r'\1', text)
-    # Odstranění zbytečných zdvojených netisknutelných mezer
     text = text.replace('\u2009', ' ')
+    
+    # Odstranění bezprostředně sousedících duplicitních slov/symbolů (např. R R -> R, M M -> M)
+    text = re.sub(r'\b(\w+)\s+\1\b', r'\1', text)
     return text
 
-# 3. Načtení textu ze všech PDF souborů v repozitáři
+# 3. Načtení textu ze všech PDF souborů v repozitáři s vyčištěním duplicit
 STUDY_MATERIALS = ""
 pdf_files = glob.glob("*.pdf")
 
@@ -32,9 +34,16 @@ for pdf_file in pdf_files:
         reader = PdfReader(pdf_file)
         STUDY_MATERIALS += f"\n--- OBSAH SOUBORU {pdf_file} ---\n"
         for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                STUDY_MATERIALS += text + "\n"
+            page_text = page.extract_text()
+            if page_text:
+                # Odstranění zdvojených řádků vzniklých při čtení PDF
+                lines = page_text.split('\n')
+                cleaned_lines = []
+                for line in lines:
+                    line_str = line.strip()
+                    if line_str and (not cleaned_lines or line_str != cleaned_lines[-1]):
+                        cleaned_lines.append(line_str)
+                STUDY_MATERIALS += "\n".join(cleaned_lines) + "\n"
     except Exception as read_err:
         st.warning(f"Nepodařilo se načíst PDF {pdf_file}: {read_err}")
 
@@ -54,16 +63,16 @@ DŮLEŽITÁ PRAVIDLA PRO ROZSAH LÁTKY A REAKCE (PŘÍSNÁ OMEZENÍ):
 
 PRAVIDLA PRO MATEMATICKÝ ZÁPIS (EXTRÉMNĚ DŮLEŽITÉ):
 1. VŠECHNY matematické výrazy, symboly a formule píš POUZE JEDNOU v čitelné LaTeXové podobě uzavřené v dolarech!
-   - NIKDY Neopakuj stejný vzorec dvakrát pod sebou (jednou textem a jednou LaTeXem).
+   - ABSOLUTNÍ ZÁKAZ DUPLICIT: Nikdy nepiš stejný symbol nebo formuli dvakrát za sebou ani pod sebe!
    - Správně: Reflexivnost: $(\\forall x \\in M)((x,x) \\in R)$
-   - Správně: $M = \\{{1,2,3,4\\}}$
+   - Správně: Množina $M = \\{{1,2,3\\}}$
 2. NIKDY nepoužívej zpětné uvozovky (backticks `) kolem matematiky, formulí ani čísel!
 3. Přepisuj přesně označení a symboliku z přiložených podkladů.
 
 DIDAKTICKÁ PRAVIDLA:
 1. NIKDY nedávej studentovi kompletní řešení příkladu hned v první odpovědi, pokud tě o to explicitně nepožádá.
 2. Postupuj krok za krokem: naváděj ho otázkami.
-3. Výrokovou logiku vysvětluj polopaticky a při srovnání tvarů používej přehledné TABULKY.
+3. Výrokovou logiku vysvětluj polopaticky a při srovnání tvarů používáj přehledné TABULKY.
 4. Procvičovací příklady generuj podle náročnosti úloh ze cvičení (ZM 1 až ZM 9).
 
 DŮLEŽITÉ - STUDIJNÍ MATERIÁLY K PŘEDMĚTU:
@@ -75,14 +84,13 @@ Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následuj
 model = genai.GenerativeModel(
     model_name="models/gemini-flash-lite-latest",
     system_instruction=SYSTEM_INSTRUCTIONS,
-    generation_config={"temperature": 0.4}
+    generation_config={"temperature": 0.3} # Snížená teplota pro minimalizaci chyb v zápisu
 )
 
 # 4. Inicializace relace chatu s pamětí
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Inicializace Gemini Chat objektu v session_state pro udržení celé historie
 if "chat" not in st.session_state:
     st.session_state.chat = model.start_chat(history=[])
 
