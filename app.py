@@ -15,10 +15,12 @@ st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
 
-# Funkce pro vyčištění textu - odstraní uvozovky kódového bloku z matematických výrazů
+# Funkce pro vyčištění textu - odstraní uvozovky kódového bloku z matematických výrazů a opraví LaTeX
 def clean_latex(text: str) -> str:
     text = re.sub(r'`(\$[^`]+\$)`', r'\1', text)
     text = re.sub(r'`(\d+)`', r'\1', text)
+    # Odstranění zbytečných zdvojených netisknutelných mezer
+    text = text.replace('\u2009', ' ')
     return text
 
 # 3. Načtení textu ze všech PDF souborů v repozitáři
@@ -45,15 +47,16 @@ DŮLEŽITÁ PRAVIDLA PRO ROZSAH LÁTKY A REAKCE (PŘÍSNÁ OMEZENÍ):
 1. DRŽ SE STRIKTNĚ ROZSAHU PŘEDMĚTU TZI I:
    - NIKDY nevytahuj pokročilou teoretickou matematiku nad rámec základního kurzu TZI I (např. NIKDY nezmiňuj Zermelo-Fraenkelovu teorii množin (ZF/ZFC), axiomatiku, vyšší kardinality apod.).
    - Pokud student udělá chybnou úvahu (např. zamění uspořádané dvojice a množiny), NIKDY ho nepřeceňuj frázemi typu "To je velmi hluboká a zajímavá myšlenka...".
-   - Místo toho věcně, stručně a přímo vysvětli základní rozdíl (např. "Uspořádaná dvojice není množina, protože u dvojice záleží na pořadí prvků $(a,b) \\neq (b,a)$, zatímco u množiny na pořadí nezáleží $\\{{a,b\\}} = \\{{b,a\\}}$.").
+   - Místo toho věcně, stručně a přímo vysvětli základní rozdíl.
 2. UDRŽUJ DŮSLEDNĚ KONTEXT A NAVAZUJ NA PŘEDCHOZÍ ZPRÁVY:
    - Sleduj celou historii konverzace. Pokud ti student odpovídá na tvou předchozí otázku nebo naváděcí podnět, VŽDY na tento kontext přímo navěž.
    - Nikdy se neptej znova na to, na co ti právě odpověděl, a neber jeho odpověď jako novou samostatnou úlohu.
 
-PRAVIDLA PRO MATEMATICKÝ ZÁPIS:
-1. VŠECHNY matematické symboly, výrokové formule, šipky, proměnné a relace MUSÍŠ psát POUZE v platném LaTeXu uzavřeném v dolarech!
-   - Inline zápis: $p \\Rightarrow q$, $p \\land \\neg q$, $x \\in \\mathbb{{R}}$, $(a,b) \\neq (b,a)$.
-   - Samostatný vzorec: $$p \\Rightarrow q$$
+PRAVIDLA PRO MATEMATICKÝ ZÁPIS (EXTRÉMNĚ DŮLEŽITÉ):
+1. VŠECHNY matematické výrazy, symboly a formule píš POUZE JEDNOU v čitelné LaTeXové podobě uzavřené v dolarech!
+   - NIKDY Neopakuj stejný vzorec dvakrát pod sebou (jednou textem a jednou LaTeXem).
+   - Správně: Reflexivnost: $(\\forall x \\in M)((x,x) \\in R)$
+   - Správně: $M = \\{{1,2,3,4\\}}$
 2. NIKDY nepoužívej zpětné uvozovky (backticks `) kolem matematiky, formulí ani čísel!
 3. Přepisuj přesně označení a symboliku z přiložených podkladů.
 
@@ -72,7 +75,7 @@ Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následuj
 model = genai.GenerativeModel(
     model_name="models/gemini-flash-lite-latest",
     system_instruction=SYSTEM_INSTRUCTIONS,
-    generation_config={"temperature": 0.5}  # Snížená teplota pro věcnější a přesnější odpovědi
+    generation_config={"temperature": 0.4}
 )
 
 # 4. Inicializace relace chatu s pamětí
@@ -98,7 +101,6 @@ for message in st.session_state.messages:
 prompt = st.chat_input("Napište svůj dotaz...")
 
 if prompt:
-    # Uložení a zobrazení uživatelského dotazu
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -106,7 +108,6 @@ if prompt:
     with st.chat_message("assistant"):
         with st.spinner("AI Tutor přemýšlí..."):
             try:
-                # Odeslání zprávy přes st.session_state.chat, který uchovává kompletní kontext konverzace
                 response = st.session_state.chat.send_message(prompt)
                 answer = clean_latex(response.text)
                 
