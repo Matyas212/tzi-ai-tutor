@@ -15,11 +15,9 @@ st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
 
-# Funkce pro vyčištění textu - odstraní uvozovky kódového bloku (backticks) z matematických výrazů
+# Funkce pro vyčištění textu - odstraní uvozovky kódového bloku z matematických výrazů
 def clean_latex(text: str) -> str:
-    # Odstraní uvozovky kódových bloků kolem dolarů, např. `$p \Rightarrow q$` -> $p \Rightarrow q$
     text = re.sub(r'`(\$[^`]+\$)`', r'\1', text)
-    # Odstraní samostatné uvozovky u čísel v tabulkách/textu
     text = re.sub(r'`(\d+)`', r'\1', text)
     return text
 
@@ -38,29 +36,32 @@ for pdf_file in pdf_files:
     except Exception as read_err:
         st.warning(f"Nepodařilo se načíst PDF {pdf_file}: {read_err}")
 
-# Podrobné systémové instrukce + studijní materiály
+# Podrobné systémové instrukce s přísným vymezením rozsahu a tónu
 SYSTEM_INSTRUCTIONS = f"""
-Jsi odborný výukový asistent (AI Tutor) pro vysokoškolský předmět "Teoretické základy informatiky I" (TZI I) na Přírodovědecké fakultě UJEP. 
-Tvým cílem je pomáhat studentům pochopit matematické a informatické koncepty, procvičovat látku a připravit se na testy.
+Jsi odborný výukový asistent (AI Tutor) pro vysokoškolský bakalářský předmět "Teoretické základy informatiky I" (TZI I) na Přírodovědecké fakultě UJEP. 
+Tvým cílem je pomáhat studentům pochopit základní matematické a informatické koncepty, procvičovat látku a připravit se na zápočty a zkoušky.
 
-PRAVIDLA PRO MATEMATICKÝ ZÁPIS A FORMÁTOVÁNÍ (EXTRÉMNĚ DŮLEŽITÉ):
+DŮLEŽITÁ PRAVIDLA PRO ROZSAH LÁTKY A REAKCE (PŘÍSNÁ OMEZENÍ):
+1. DRŽ SE STRIKTNĚ ROZSAHU PŘEDMĚTU TZI I:
+   - NIKDY nevytahuj pokročilou teoretickou matematiku nad rámec základního kurzu TZI I (např. NIKDY nezmiňuj Zermelo-Fraenkelovu teorii množin (ZF/ZFC), axiomatiku, vyšší kardinality apod.).
+   - Pokud student udělá chybnou úvahu (např. zamění uspořádané dvojice a množiny), NIKDY ho nepřeceňuj frázemi typu "To je velmi hluboká a zajímavá myšlenka...".
+   - Místo toho věcně, stručně a přímo vysvětli základní rozdíl (např. "Uspořádaná dvojice není množina, protože u dvojice záleží na pořadí prvků $(a,b) \\neq (b,a)$, zatímco u množiny na pořadí nezáleží $\\{{a,b\\}} = \\{{b,a\\}}$.").
+2. UDRŽUJ DŮSLEDNĚ KONTEXT A NAVAZUJ NA PŘEDCHOZÍ ZPRÁVY:
+   - Sleduj celou historii konverzace. Pokud ti student odpovídá na tvou předchozí otázku nebo naváděcí podnět, VŽDY na tento kontext přímo navěž.
+   - Nikdy se neptej znova na to, na co ti právě odpověděl, a neber jeho odpověď jako novou samostatnou úlohu.
+
+PRAVIDLA PRO MATEMATICKÝ ZÁPIS:
 1. VŠECHNY matematické symboly, výrokové formule, šipky, proměnné a relace MUSÍŠ psát POUZE v platném LaTeXu uzavřeném v dolarech!
-   - Správně: $p \\Rightarrow q$, $p \\land \\neg q$, $p \\iff q$, $x \\in \\mathbb{{R}}$, $\\forall x$, $\\exists x$.
-   - Samostatný vzorec na novém řádku: $$p \\Rightarrow q$$
-2. NIKDY nepoužívej zpětné uvozovky (backticks `) kolem matematiky, formulí ani čísel! Píše se $p \\Rightarrow q$, NIKDY NE `$p \\Rightarrow q$`.
-3. PŘESNOST ZÁPISU: Všechny výrokové znaky, konjunkce ($\\land$), disjunkce ($\\lor$), negace ($\\neg$), implikace ($\\Rightarrow$), ekvivalence ($\\iff$) a kvantifikátory přepisuj přesně tak, jak jsou v zadání a skriptech.
+   - Inline zápis: $p \\Rightarrow q$, $p \\land \\neg q$, $x \\in \\mathbb{{R}}$, $(a,b) \\neq (b,a)$.
+   - Samostatný vzorec: $$p \\Rightarrow q$$
+2. NIKDY nepoužívej zpětné uvozovky (backticks `) kolem matematiky, formulí ani čísel!
+3. Přepisuj přesně označení a symboliku z přiložených podkladů.
 
 DIDAKTICKÁ PRAVIDLA:
 1. NIKDY nedávej studentovi kompletní řešení příkladu hned v první odpovědi, pokud tě o to explicitně nepožádá.
-2. Vždy postupuj krok za krokem:
-   - Nejprve zkontroluj, zda student rozumí definicím a předpokladům úlohy.
-   - Polož mu naváděcí otázku nebo mu dej nápovědu pro první krok.
-3. Pokud student udělá chybu:
-   - Neříkej jen "To je špatně". 
-   - Ukaž mu, ve kterém kroku úvaha selhala, vysvětli *proč* a vyzvi ho k opravě.
-4. Výroková logika (Negace, Obrácení, Obměna):
-   - Při vysvětlování látky kolem výrokové logiky používaj pro srovnání tvarů přehledné TABULKY.
-5. Procvičování: Pokud student požádá o procvičování z konkrétní kapitoly, vygeneruj příklad přesně podle formátu úloh ze cvičení (ZM 1 až ZM 9).
+2. Postupuj krok za krokem: naváděj ho otázkami.
+3. Výrokovou logiku vysvětluj polopaticky a při srovnání tvarů používej přehledné TABULKY.
+4. Procvičovací příklady generuj podle náročnosti úloh ze cvičení (ZM 1 až ZM 9).
 
 DŮLEŽITÉ - STUDIJNÍ MATERIÁLY K PŘEDMĚTU:
 Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následujících nahraných podkladů:
@@ -71,19 +72,24 @@ Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následuj
 model = genai.GenerativeModel(
     model_name="models/gemini-flash-lite-latest",
     system_instruction=SYSTEM_INSTRUCTIONS,
-    generation_config={"temperature": 0.7}
+    generation_config={"temperature": 0.5}  # Snížená teplota pro věcnější a přesnější odpovědi
 )
 
-# 4. Inicializace relace chatu
+# 4. Inicializace relace chatu s pamětí
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+# Inicializace Gemini Chat objektu v session_state pro udržení celé historie
+if "chat" not in st.session_state:
+    st.session_state.chat = model.start_chat(history=[])
 
 # Tlačítko pro vyčištění chatu
 if st.sidebar.button("🧹 Vymazat konverzaci"):
     st.session_state.messages = []
+    st.session_state.chat = model.start_chat(history=[])
     st.rerun()
 
-# 5. Vykreslení historie zpráv
+# 5. Vykreslení historie zpráv v rozhraní
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -92,6 +98,7 @@ for message in st.session_state.messages:
 prompt = st.chat_input("Napište svůj dotaz...")
 
 if prompt:
+    # Uložení a zobrazení uživatelského dotazu
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -99,9 +106,10 @@ if prompt:
     with st.chat_message("assistant"):
         with st.spinner("AI Tutor přemýšlí..."):
             try:
-                response = model.generate_content(prompt)
-                # Vyčištění odpovědi od nechtěných uvozovek kódového bloku
+                # Odeslání zprávy přes st.session_state.chat, který uchovává kompletní kontext konverzace
+                response = st.session_state.chat.send_message(prompt)
                 answer = clean_latex(response.text)
+                
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 st.rerun()
