@@ -4,109 +4,100 @@ import os
 import glob
 import re
 from pypdf import PdfReader
+from PIL import Image
 
-# 1. Nastavení vzhledu stránky
+# 1. Nastavení stránky
 st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="centered")
-
 st.title("🎓 Výukový AI Tutor - TZI I")
 st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
 
-# 2. Inicializace klienta Gemini
+# 2. Inicializace Gemini klienta
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
 
-# Funkce pro vyčištění textu a odstranění duplicit z PDF
 def clean_latex(text: str) -> str:
     text = re.sub(r'`(\$[^`]+\$)`', r'\1', text)
     text = re.sub(r'`(\d+)`', r'\1', text)
     text = text.replace('\u2009', ' ')
-    
-    # Odstranění bezprostředně sousedících duplicitních slov/symbolů (např. R R -> R, M M -> M)
-    text = re.sub(r'\b(\w+)\s+\1\b', r'\1', text)
-    return text
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not cleaned_lines or stripped != cleaned_lines[-1].strip():
+            cleaned_lines.append(line)
+    return '\n'.join(cleaned_lines)
 
-# 3. Načtení textu ze všech PDF souborů v repozitáři s vyčištěním duplicit
+# 3. Načtení interních studijních materiálů
 STUDY_MATERIALS = ""
-pdf_files = glob.glob("*.pdf")
-
-for pdf_file in pdf_files:
+for pdf_file in glob.glob("*.pdf"):
     try:
         reader = PdfReader(pdf_file)
-        STUDY_MATERIALS += f"\n--- OBSAH SOUBORU {pdf_file} ---\n"
+        STUDY_MATERIALS += f"\n--- PODKLAD {pdf_file} ---\n"
         for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                # Odstranění zdvojených řádků vzniklých při čtení PDF
-                lines = page_text.split('\n')
-                cleaned_lines = []
-                for line in lines:
-                    line_str = line.strip()
-                    if line_str and (not cleaned_lines or line_str != cleaned_lines[-1]):
-                        cleaned_lines.append(line_str)
-                STUDY_MATERIALS += "\n".join(cleaned_lines) + "\n"
-    except Exception as read_err:
-        st.warning(f"Nepodařilo se načíst PDF {pdf_file}: {read_err}")
+            t = page.extract_text()
+            if t:
+                STUDY_MATERIALS += t + "\n"
+    except Exception as e:
+        pass
 
-# Podrobné systémové instrukce s přísným vymezením rozsahu a tónu
+# 4. Didaktické a systémové instrukce
 SYSTEM_INSTRUCTIONS = f"""
-Jsi odborný výukový asistent (AI Tutor) pro vysokoškolský bakalářský předmět "Teoretické základy informatiky I" (TZI I) na Přírodovědecké fakultě UJEP. 
-Tvým cílem je pomáhat studentům pochopit základní matematické a informatické koncepty, procvičovat látku a připravit se na zápočty a zkoušky.
+Jsi odborný výukový asistent (AI Tutor) pro vysokoškolský kurz "Teoretické základy informatiky I" (TZI I) na Přírodovědecké fakultě UJEP.
 
-DŮLEŽITÁ PRAVIDLA PRO ROZSAH LÁTKY A REAKCE (PŘÍSNÁ OMEZENÍ):
-1. DRŽ SE STRIKTNĚ ROZSAHU PŘEDMĚTU TZI I:
-   - NIKDY nevytahuj pokročilou teoretickou matematiku nad rámec základního kurzu TZI I (např. NIKDY nezmiňuj Zermelo-Fraenkelovu teorii množin (ZF/ZFC), axiomatiku, vyšší kardinality apod.).
-   - Pokud student udělá chybnou úvahu (např. zamění uspořádané dvojice a množiny), NIKDY ho nepřeceňuj frázemi typu "To je velmi hluboká a zajímavá myšlenka...".
-   - Místo toho věcně, stručně a přímo vysvětli základní rozdíl.
-2. UDRŽUJ DŮSLEDNĚ KONTEXT A NAVAZUJ NA PŘEDCHOZÍ ZPRÁVY:
-   - Sleduj celou historii konverzace. Pokud ti student odpovídá na tvou předchozí otázku nebo naváděcí podnět, VŽDY na tento kontext přímo navěž.
-   - Nikdy se neptej znova na to, na co ti právě odpověděl, a neber jeho odpověď jako novou samostatnou úlohu.
+DIDAKTICKÉ A OBSAHOVÉ ZÁSADY:
+1. SOKRATOVSKÉ VEDENÍ:
+   - Nikdy neposkytuj kompletní řešení ihned v první odpovědi.
+   - Veď studenta po dílčích logických krocích a ověřuj pochopení kontrolními otázkami.
+   - Pokud student nahraje fotografii/obrázek svého postupu, analyzuj jeho zápis, přesně lokalizuj první chybu a naved ho k její opravě.
+2. ZÁKAZ ODKAZŮ NA ČÍSLA ÚLOH:
+   - NIKDY se neodkazuj na konkrétní číslování úloh nebo sad (např. neříkej "v úloze 3", "v sadě ZM 4").
+   - Odkazuj se výhradně na konkrétní matematická témata (např. "při negaci kvantifikovaných výroků", "u relací ekvivalence").
+3. VĚCNOST A ROZSAH:
+   - Drž se látky bakalářského kurzu TZI I. Nevytahuj axiomatickou teorii množin (ZF/ZFC).
+   - Při chybě studenta odpověz věcně a přímo, bez frází typu "To je hluboká myšlenka".
+4. FORMÁTOVÁNÍ:
+   - Veškeré matematické výrazy piš výhradně v LaTeXu ohraničeném dolary ($...$). Nezdvojuj vzorce.
 
-PRAVIDLA PRO MATEMATICKÝ ZÁPIS (EXTRÉMNĚ DŮLEŽITÉ):
-1. VŠECHNY matematické výrazy, symboly a formule píš POUZE JEDNOU v čitelné LaTeXové podobě uzavřené v dolarech!
-   - ABSOLUTNÍ ZÁKAZ DUPLICIT: Nikdy nepiš stejný symbol nebo formuli dvakrát za sebou ani pod sebe!
-   - Správně: Reflexivnost: $(\\forall x \\in M)((x,x) \\in R)$
-   - Správně: Množina $M = \\{{1,2,3\\}}$
-2. NIKDY nepoužívej zpětné uvozovky (backticks `) kolem matematiky, formulí ani čísel!
-3. Přepisuj přesně označení a symboliku z přiložených podkladů.
-
-DIDAKTICKÁ PRAVIDLA:
-1. NIKDY nedávej studentovi kompletní řešení příkladu hned v první odpovědi, pokud tě o to explicitně nepožádá.
-2. Postupuj krok za krokem: naváděj ho otázkami.
-3. Výrokovou logiku vysvětluj polopaticky a při srovnání tvarů používáj přehledné TABULKY.
-4. Procvičovací příklady generuj podle náročnosti úloh ze cvičení (ZM 1 až ZM 9).
-
-DŮLEŽITÉ - STUDIJNÍ MATERIÁLY K PŘEDMĚTU:
-Všechny svoje odpovědi, příklady a nápovědy primárně čerpej z následujících nahraných podkladů:
-{STUDY_MATERIALS if STUDY_MATERIALS else "Strojově dostupné podklady v PDF formátu nebyly nahrány, vycházej z obecných osnov předmětu TZI I na UJEP."}
+STUDIJNÍ PODKLADY PŘEDMĚTU:
+{STUDY_MATERIALS}
 """
 
-# Vytvoření modelu
 model = genai.GenerativeModel(
     model_name="models/gemini-flash-lite-latest",
     system_instruction=SYSTEM_INSTRUCTIONS,
-    generation_config={"temperature": 0.3} # Snížená teplota pro minimalizaci chyb v zápisu
+    generation_config={"temperature": 0.2}
 )
 
-# 4. Inicializace relace chatu s pamětí
+# 5. Session State
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "chat" not in st.session_state:
     st.session_state.chat = model.start_chat(history=[])
 
-# Tlačítko pro vyčištění chatu
-if st.sidebar.button("🧹 Vymazat konverzaci"):
-    st.session_state.messages = []
-    st.session_state.chat = model.start_chat(history=[])
-    st.rerun()
+# 6. Postranní panel - Nahrání souboru a správa
+with st.sidebar:
+    st.header("📎 Příloha studenta")
+    uploaded_file = st.file_uploader(
+        "Nahrajte fotku postupu / zadání (PNG, JPG)", 
+        type=["png", "jpg", "jpeg"]
+    )
+    student_image = None
+    if uploaded_file is not None:
+        student_image = Image.open(uploaded_file)
+        st.image(student_image, caption="Nahraná příloha", use_container_width=True)
+    
+    if st.button("🧹 Vymazat konverzaci"):
+        st.session_state.messages = []
+        st.session_state.chat = model.start_chat(history=[])
+        st.rerun()
 
-# 5. Vykreslení historie zpráv v rozhraní
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# 7. Vykreslení historie
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-# 6. Vstupní pole
-prompt = st.chat_input("Napište svůj dotaz...")
+# 8. Zpracování vstupu
+prompt = st.chat_input("Napište svůj dotaz nebo se zeptejte k nahranému obrázku...")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -114,13 +105,18 @@ if prompt:
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("AI Tutor přemýšlí..."):
+        with st.spinner("AI Tutor analyzuje zadání..."):
             try:
-                response = st.session_state.chat.send_message(prompt)
-                answer = clean_latex(response.text)
-                
-                st.markdown(answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+                # Pokud student nahrál obrázek, odešle se společně s textem
+                if student_image:
+                    content_payload = [prompt, student_image]
+                else:
+                    content_payload = prompt
+
+                response = st.session_state.chat.send_message(content_payload)
+                ans = clean_latex(response.text)
+                st.markdown(ans)
+                st.session_state.messages.append({"role": "assistant", "content": ans})
                 st.rerun()
             except Exception as e:
-                st.error(f"Pevný výpis chyby API: {e}")
+                st.error(f"Chyba při komunikaci s modelem: {e}")
