@@ -78,7 +78,7 @@ if "messages" not in st.session_state:
 if "chat" not in st.session_state:
     st.session_state.chat = model.start_chat(history=[])
 
-# 6. Postranní panel: Přílohy a export do HTML s MathJaxem
+# 6. Postranní panel: Přílohy a export do HTML s konfigurací pro $...$ MathJax
 with st.sidebar:
     st.header("📎 Příloha studenta")
     uploaded_file = st.file_uploader("Nahrajte fotku / zadání (PNG, JPG)", type=["png", "jpg", "jpeg"])
@@ -90,18 +90,31 @@ with st.sidebar:
     st.divider()
     st.header("💾 Uložení konverzace")
     
-    # Sestavení samostatné HTML stránky s MathJax skriptem
+    # Sestavení samostatné HTML stránky s explicitní konfigurací pro inline dolary
     html_export = """<!DOCTYPE html>
 <html lang="cs">
 <head>
 <meta charset="utf-8">
 <title>Záznam konzultace - AI Tutor TZI I</title>
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<!-- Explicitní konfigurace MathJaxu pro řádkové $...$ -->
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+    displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <style>
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     line-height: 1.6;
-    max-width: 820px;
+    max-width: 840px;
     margin: 40px auto;
     padding: 0 20px;
     background-color: #f8fafc;
@@ -136,7 +149,11 @@ with st.sidebar:
   }
   .user .sender { color: #b91c1c; }
   .assistant .sender { color: #1d4ed8; }
-  .content { white-space: pre-wrap; word-wrap: break-word; }
+  .content { 
+    white-space: pre-wrap; 
+    word-wrap: break-word; 
+    font-size: 1.02em;
+  }
 </style>
 </head>
 <body>
@@ -146,11 +163,12 @@ with st.sidebar:
     for m in st.session_state.messages:
         role_class = "user" if m["role"] == "user" else "assistant"
         role_label = "👤 Student" if m["role"] == "user" else "🤖 AI Tutor"
-        content_escaped = m["content"].replace("<", "&lt;").replace(">", "&gt;")
+        # Nahrazení textových nerovností za typografické symboly
+        raw_text = m["content"].replace("<=", "≤").replace(">=", "≥")
         html_export += f"""
 <div class="message {role_class}">
   <div class="sender">{role_label}</div>
-  <div class="content">{content_escaped}</div>
+  <div class="content">{raw_text}</div>
 </div>
 """
 
