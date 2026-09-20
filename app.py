@@ -4,58 +4,26 @@ import glob
 import re
 from pypdf import PdfReader
 from PIL import Image
-from supabase import create_client, Client
 
 # 1. Konfigurace stránky Streamlit
 st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="centered")
 st.title("🎓 Výukový AI Tutor - TZI I")
 st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
 
-# 2. Připojení k databázi Supabase
-@st.cache_resource
-def init_supabase() -> Client:
-    try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-        return create_client(url, key)
-    except Exception:
-        return None
-
-supabase = init_supabase()
-
-def save_message(username, role, content):
-    if supabase:
-        try:
-            supabase.table("chat_history").insert({
-                "username": username,
-                "role": role,
-                "content": content
-            }).execute()
-        except Exception as e:
-            st.error(f"Chyba uložení do databáze: {e}")
-
-def load_history(username):
-    if supabase:
-        try:
-            # Načte historii seřazenou chronologicky podle ID
-            response = supabase.table("chat_history").select("*").eq("username", username).order("id").execute()
-            return response.data
-        except Exception as e:
-            st.error(f"Chyba načtení z databáze: {e}")
-    return []
-
-# 3. Inicializace API klíče Gemini
+# 2. Inicializace API klíče
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
 
 def clean_latex(text: str) -> str:
+    # Odstranění zbloudilých kódových bloků kolem dollarů
     text = re.sub(r'`(\$[^`]+\$)`', r'\1', text)
     text = re.sub(r'`(\d+)`', r'\1', text)
     text = text.replace('\u2009', ' ')
+    # Ošetření překlepů tokenizéru
     text = text.replace("konjunkcija", "konjunkce")
     return text
 
-# 4. Načtení podkladových materiálů kurzu
+# 3. Načtení podkladových materiálů kurzu (PDF skripta)
 STUDY_MATERIALS = ""
 for pdf_file in glob.glob("*.pdf"):
     try:
@@ -68,7 +36,7 @@ for pdf_file in glob.glob("*.pdf"):
     except Exception:
         pass
 
-# 5. Systémové instrukce
+# 4. Systémové instrukce se striktními didaktickými a jazykovými pravidly
 SYSTEM_INSTRUCTIONS = f"""
 Jste odborný vysokoškolský AI Tutor pro předmět "Teoretické základy informatiky I" (TZI I) na Přírodovědecké fakultě UJEP.
 
@@ -84,14 +52,14 @@ KOMUNIKACE A JAZYK:
 
 MATEMATICKÁ PŘESNOST A FORMÁT:
 - DŮSLEDNOST U MNOŽIN: Pokud množina obsahuje jako prvek jinou množinu (např. B = {{2, 3, {{4, 5}}}}), tento vnitřní prvek je jedním nerozdělitelným celkem! Nikdy prvky nevysypávejte do {{2, 3, 4, 5}}.
-- ZÁKAZ ODKAZŮ NA ČÍSLA ÚLOH: NIKDY se neodkazujte na konkrétní čísla úloh či sad. Odkazujte se pouze na věcná matematická témata.
+- ZÁKAZ ODKAZŮ NA ČÍSLA ÚLOH: NIKDY se neodkazujte na konkrétní čísla úloh či sad (např. neuvádějte "v úloze 3", "v sadě ZM 4"). Odkazujte se pouze na věcná matematická témata.
 - LATEXOVÁ PRAVIDLA:
   * Matematické vzorce vkládejte striktně mezi dolary ($...$).
-  * Běžný text NIKDY nevkládejte dovnitř dollarů. Mezi vzorcem a textem musí být vždy zřetelná mezera a uzavřený dollar.
+  * Běžný text NIKDY nevkládejte dovnitř dollarů. Mezi vzorcem a textem musí být vždy zřetelná mezera a uzavřený dollar, aby nedošlo k slití textu do matematického fontu.
 
 DIDAKTICKÉ VEDENÍ:
 - Sokratovská metoda: Veďte studenta po jednotlivých krocích, nepředávejte hotová řešení hned v první odpovědi.
-- NEPŘIJÍMEJTE VÁGNÍ ODPOVĚDI: Pokud student odpoví neúplně nebo nepřesně, vlídně jej vyzvěte k upřesnění chybějící části.
+- NEPŘIJÍMEJTE VÁGNÍ ODPOVĚDI: Pokud student odpoví neúplně nebo nepřesně, neoznačujte odpověď jako zcela správnou. Vlídně jej vyzvěte k upřesnění chybějící části.
 - POKUD STUDENT NAHRAJE FOTKU / OBRÁZEK: Analyzujte jeho postup, najděte přesné místo první chyby a otázkou jej navedte na správný směr.
 
 STUDIJNÍ PODKLADY PŘEDMĚTU:
@@ -104,41 +72,14 @@ model = genai.GenerativeModel(
     generation_config={"temperature": 0.15}
 )
 
-# 6. Přihlášení studenta
-if "username" not in st.session_state:
-    st.session_state.username = None
-
-if st.session_state.username is None:
-    st.info("👋 Vítejte! Pro načtení nebo uložení vaší konverzace zadejte svou přezdívku či ID.")
-    username_input = st.text_input("Vaše přezdívka (např. JanN, student01):")
-    if st.button("Vstoupit do aplikace") and username_input:
-        st.session_state.username = username_input.strip()
-        st.rerun()
-    st.stop() # Zastaví vykreslování chatu, dokud se student nepodepíše
-
-# 7. Načtení paměti a inicializace chatu po přihlášení
+# 5. Inicializace stavu relace
 if "messages" not in st.session_state:
-    db_messages = load_history(st.session_state.username)
-    st.session_state.messages = [{"role": m["role"], "content": m["content"]} for m in db_messages]
-
+    st.session_state.messages = []
 if "chat" not in st.session_state:
-    gemini_history = []
-    for m in st.session_state.messages:
-        gemini_role = "user" if m["role"] == "user" else "model"
-        gemini_history.append({"role": gemini_role, "parts": [m["content"]]})
-    
-    st.session_state.chat = model.start_chat(history=gemini_history)
+    st.session_state.chat = model.start_chat(history=[])
 
-# 8. Postranní panel
+# 6. Postranní panel: Přílohy a export do HTML s konfigurací pro $...$ MathJax
 with st.sidebar:
-    st.markdown(f"👤 **Přihlášený student:** `{st.session_state.username}`")
-    if st.button("🚪 Odhlásit se"):
-        st.session_state.username = None
-        st.session_state.messages = []
-        del st.session_state.chat
-        st.rerun()
-
-    st.divider()
     st.header("📎 Příloha studenta")
     uploaded_file = st.file_uploader("Nahrajte fotku / zadání (PNG, JPG)", type=["png", "jpg", "jpeg"])
     student_image = None
@@ -148,26 +89,117 @@ with st.sidebar:
     
     st.divider()
     st.header("💾 Uložení konverzace")
-    # Zde zůstává váš kód pro export HTML nezměněn... (zkráceno pro přehlednost, vložte sem původní HTML export blok)
-    if st.button("🧹 Vymazat historii tohoto chatu"):
-        if supabase:
-            supabase.table("chat_history").delete().eq("username", st.session_state.username).execute()
+    
+    # Sestavení samostatné HTML stránky s explicitní konfigurací pro inline dolary
+    html_export = """<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Záznam konzultace - AI Tutor TZI I</title>
+<!-- Explicitní konfigurace MathJaxu pro řádkové $...$ -->
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+    displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 840px;
+    margin: 40px auto;
+    padding: 0 20px;
+    background-color: #f8fafc;
+    color: #1e293b;
+  }
+  h2 {
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 12px;
+  }
+  .message {
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    border-radius: 8px;
+  }
+  .user {
+    background-color: #ffffff;
+    border-left: 5px solid #ef4444;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .assistant {
+    background-color: #f1f5f9;
+    border-left: 5px solid #2563eb;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .sender {
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .user .sender { color: #b91c1c; }
+  .assistant .sender { color: #1d4ed8; }
+  .content { 
+    white-space: pre-wrap; 
+    word-wrap: break-word; 
+    font-size: 1.02em;
+  }
+</style>
+</head>
+<body>
+<h2>🎓 Záznam konzultace: Teoretické základy informatiky I</h2>
+"""
+
+    for m in st.session_state.messages:
+        role_class = "user" if m["role"] == "user" else "assistant"
+        role_label = "👤 Student" if m["role"] == "user" else "🤖 AI Tutor"
+        # Nahrazení textových nerovností za typografické symboly
+        raw_text = m["content"].replace("<=", "≤").replace(">=", "≥")
+        html_export += f"""
+<div class="message {role_class}">
+  <div class="sender">{role_label}</div>
+  <div class="content">{raw_text}</div>
+</div>
+"""
+
+    html_export += """
+</body>
+</html>
+"""
+
+    st.download_button(
+        label="📥 Stáhnout přehledný záznam (.html)",
+        data=html_export,
+        file_name="konverzace_tutor_tzi.html",
+        mime="text/html",
+        disabled=(len(st.session_state.messages) == 0)
+    )
+    
+    if st.button("🧹 Nová konverzace (Vymazat)"):
         st.session_state.messages = []
         st.session_state.chat = model.start_chat(history=[])
         st.rerun()
 
-# 9. Vykreslení historie zpráv
+# 7. Vykreslení historie zpráv
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# 10. Zpracování uživatelského vstupu
+# 8. Zpracování uživatelského vstupu
 prompt = st.chat_input("Zadejte svůj dotaz nebo odpověď k příkladu...")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
-    save_message(st.session_state.username, "user", prompt)
-    
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -182,9 +214,7 @@ if prompt:
                 response = st.session_state.chat.send_message(content_payload)
                 ans = clean_latex(response.text)
                 st.markdown(ans)
-                
                 st.session_state.messages.append({"role": "assistant", "content": ans})
-                save_message(st.session_state.username, "assistant", ans)
-                
+                st.rerun()
             except Exception as e:
                 st.error(f"Chyba při komunikaci: {e}")
