@@ -1,7 +1,11 @@
+Zde je kompletní kód pro app.py s přímo doplněnou URL adresou formuláře i identifikačním číslem pole:
+
+Python
 import streamlit as st
 import google.generativeai as genai
 import glob
 import re
+import requests
 from pypdf import PdfReader
 from PIL import Image
 
@@ -14,14 +18,24 @@ st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 genai.configure(api_key=api_key)
 
+# Konfigurace pro Google Formulář
+FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfVrs3iUAfyQEseHWst9uFBJzTe-UrlnN3VSObA2Jmr2DH-MA/formResponse"
+POLE = "entry.1929232347"
+
 def clean_latex(text: str) -> str:
-    # Odstranění zbloudilých kódových bloků kolem dollarů
     text = re.sub(r'`(\$[^`]+\$)`', r'\1', text)
     text = re.sub(r'`(\d+)`', r'\1', text)
     text = text.replace('\u2009', ' ')
-    # Ošetření překlepů tokenizéru
     text = text.replace("konjunkcija", "konjunkce")
     return text
+
+def konverzace_text(messages):
+    bloky = []
+    for m in messages:
+        if isinstance(m.get("content"), str):  # obrázky se neposílají
+            kdo = "Student" if m["role"] == "user" else "Tutor"
+            bloky.append(f"{kdo}:\n{m['content']}")
+    return "\n\n---\n\n".join(bloky)
 
 # 3. Načtení podkladových materiálů kurzu (PDF skripta)
 STUDY_MATERIALS = ""
@@ -78,7 +92,7 @@ if "messages" not in st.session_state:
 if "chat" not in st.session_state:
     st.session_state.chat = model.start_chat(history=[])
 
-# 6. Postranní panel: Přílohy a export do HTML s konfigurací pro $...$ MathJax
+# 6. Postranní panel: Přílohy, export do HTML a anonymní odesílání
 with st.sidebar:
     st.header("📎 Příloha studenta")
     uploaded_file = st.file_uploader("Nahrajte fotku / zadání (PNG, JPG)", type=["png", "jpg", "jpeg"])
@@ -90,13 +104,12 @@ with st.sidebar:
     st.divider()
     st.header("💾 Uložení konverzace")
     
-    # Sestavení samostatné HTML stránky s explicitní konfigurací pro inline dolary
+    # Sestavení samostatné HTML stránky s MathJax konfigurací pro $...$
     html_export = """<!DOCTYPE html>
 <html lang="cs">
 <head>
 <meta charset="utf-8">
 <title>Záznam konzultace - AI Tutor TZI I</title>
-<!-- Explicitní konfigurace MathJaxu pro řádkové $...$ -->
 <script>
 window.MathJax = {
   tex: {
@@ -163,7 +176,6 @@ window.MathJax = {
     for m in st.session_state.messages:
         role_class = "user" if m["role"] == "user" else "assistant"
         role_label = "👤 Student" if m["role"] == "user" else "🤖 AI Tutor"
-        # Nahrazení textových nerovností za typografické symboly
         raw_text = m["content"].replace("<=", "≤").replace(">=", "≥")
         html_export += f"""
 <div class="message {role_class}">
@@ -184,7 +196,27 @@ window.MathJax = {
         mime="text/html",
         disabled=(len(st.session_state.messages) == 0)
     )
+
+    st.divider()
+    st.header("📊 Anonymní zpětná vazba")
+    st.caption("Odeslání je dobrovolné a anonymní. Odešle se jen text konverzace, nic o vás.")
+    zkontrolovano = st.checkbox("Zkontroloval/a jsem, že konverzace neobsahuje osobní údaje.")
     
+    if st.button("Odeslat konverzaci anonymně", disabled=not zkontrolovano):
+        text = konverzace_text(st.session_state.messages)
+        if not text:
+            st.warning("Konverzace je prázdná.")
+        else:
+            try:
+                r = requests.post(FORM_URL, data={POLE: text}, timeout=10, allow_redirects=False)
+                if r.status_code in [200, 302]:
+                    st.success("Odesláno, děkujeme.")
+                else:
+                    st.error(f"Odeslání se nepovedlo (chyba serveru: {r.status_code}).")
+            except requests.RequestException:
+                st.error("Odeslání se nepovedlo (chyba spojení).")
+    
+    st.divider()
     if st.button("🧹 Nová konverzace (Vymazat)"):
         st.session_state.messages = []
         st.session_state.chat = model.start_chat(history=[])
