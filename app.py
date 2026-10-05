@@ -1,6 +1,3 @@
-Zde je kompletní kód pro app.py s přímo doplněnou URL adresou formuláře i identifikačním číslem pole:
-
-Python
 import streamlit as st
 import google.generativeai as genai
 import glob
