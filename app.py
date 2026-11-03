@@ -9,7 +9,7 @@ from PIL import Image
 # 1. Konfigurace stránky Streamlit
 st.set_page_config(page_title="AI Tutor - TZI I", page_icon="🎓", layout="centered")
 st.title("🎓 Výukový AI Tutor - TZI I")
-st.caption("Přírodovědecká fakulta UJEP | Teoretické základy informatiky I")
+st.caption("Přírodovědecká fakulta UJEP | Základy matematiky")
 
 # 2. Inicializace API klíče
 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
